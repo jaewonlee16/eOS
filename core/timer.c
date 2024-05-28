@@ -38,7 +38,8 @@ void eos_set_alarm(eos_counter_t* counter, eos_alarm_t* alarm, int32u_t timeout,
     // This makes the queue sorted by timeout.
     // If the timeout is same, it is then sorted by priority.
     alarm->alarm_queue_node.priority 
-        = (LOWEST_PRIORITY + 1) * timeout + ((eos_tcb_t*)arg)->node->priority;
+        = (int32u_t)((LOWEST_PRIORITY + 1) * timeout + ((eos_tcb_t*)arg)->node->priority);
+    //PRINT("alarm added priority: %u, timeout: %d, priority: %d\n", alarm->alarm_queue_node.priority, timeout,((eos_tcb_t*)arg)->node->priority )
 
     _os_add_node_priority(&counter->alarm_queue, &alarm->alarm_queue_node);
 }
@@ -52,9 +53,11 @@ eos_counter_t* eos_get_system_timer()
 
 void eos_trigger_counter(eos_counter_t* counter)
 {
+    // PRINT("tick %d\n", counter->tick + 1);
     PRINT("tick\n");
     // To be filled by students: Project 3
     counter->tick++;
+    
 
     // There could be more than 1 task at the queue, 
     // so interation is needed
@@ -78,6 +81,7 @@ void eos_trigger_counter(eos_counter_t* counter)
         // call handler
         alarm->handler(alarm->arg);
     }
+    eos_schedule();
 
 }
 

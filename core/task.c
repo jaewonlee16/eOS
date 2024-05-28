@@ -136,7 +136,7 @@ void eos_sleep(int32u_t tick) {
     eos_set_alarm(
         system_timer, 
         _os_current_task->alarm, 
-        _os_current_task->alarm->timeout + wait_time + tick, // wait time is 0 + tick if tick > 0
+        eos_get_system_timer()->tick + wait_time + tick, // wait time is 0 + tick if tick > 0
         _os_wakeup_sleeping_task, 
         _os_current_task
     );
