@@ -8,7 +8,7 @@
  ********************************************************/
 
 #include <core/eos.h>
-#define INFINITY	0x0010000
+#define WAITING 3
 
 void eos_init_semaphore(eos_semaphore_t *sem, int32u_t initial_count, int8u_t queue_type)
 {
@@ -24,33 +24,36 @@ int32u_t eos_acquire_semaphore(eos_semaphore_t *sem, int32s_t timeout)
     // To be filled by students: Project 4
     hal_disable_interrupt();
 
-	// if the resource is available, return 1
+	// if the resource is available
 	if (sem->count > 0) {
 		sem->count--;
 		hal_enable_interrupt();
 		return 1;
 	}
-	// if timeout is negative (failed), return 0;
+
+	// if timeout is negative
 	if (timeout < 0) {
 		hal_enable_interrupt();
 		return 0;
 	}
-	// if task should use the resource right after the resource is available,
+
+	// Original semaphore: waiting until resource is available
 	if (timeout == 0) {
+		// execute until reesource is available
 		while (1) {
 			// push current task into waiting queue, and yield a CPU
 			eos_tcb_t* cur_task = eos_get_current_task();
-			cur_task->state = 3; // WAITING
-			if (sem->queue_type == FIFO) {
+			cur_task->state = WAITING; // Not call eos_sleep() because alarm is not set
+
+			if (sem->queue_type == FIFO)
 				_os_add_node_tail(&(sem->wait_queue), (cur_task->node));
-			}
-			else if (sem->queue_type == PRIORITY) {
+			else if (sem->queue_type == PRIORITY)
 				_os_add_node_priority(&(sem->wait_queue), (cur_task->node));
-			}
+
 			hal_enable_interrupt();
 			eos_schedule();
 
-			// after waking up, if the resource is available, return 1
+			// after waking up, check if the resource is available
 			hal_disable_interrupt();
 			if (sem->count > 0) {
 				sem->count--;
@@ -59,10 +62,11 @@ int32u_t eos_acquire_semaphore(eos_semaphore_t *sem, int32s_t timeout)
 			}
 		}
 	}
-	// if timeout has positive value, make current task sleep for timeout
-	// and after waking up, if the resource is available, return 1
+
+	// if timeout is positive, wait until timeout
 	while (1) {
 		hal_enable_interrupt();
+		// call eos_sleep() for setting alarm
 		eos_sleep(timeout);
 		hal_disable_interrupt();
 		if (sem->count > 0) {

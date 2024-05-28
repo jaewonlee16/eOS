@@ -10,15 +10,12 @@
 #include <core/eos.h>
 
 
-void eos_init_mqueue(eos_mqueue_t *mq, void *queue_start, int16u_t queue_size, int8u_t msg_size, int8u_t queue_type)
-{
+void eos_init_mqueue(eos_mqueue_t *mq, void *queue_start, int16u_t queue_size, int8u_t msg_size, int8u_t queue_type){
     // To be filled by students: Project 4
     // PRINT("message queue: 0x%x at 0x%x || queue_size: %d, msg_size: %d\n", mq, queue_start, queue_size, msg_size)
     mq->queue_size = queue_size;
     mq->msg_size = msg_size;
 
-    // front always have its value, and rear always does not have its value
-    // So, if the addresses of front & rear are equal, it means, the queue is empty
     mq->queue_start = queue_start;
     mq->front = queue_start;
     mq->rear = queue_start;
@@ -32,53 +29,42 @@ void eos_init_mqueue(eos_mqueue_t *mq, void *queue_start, int16u_t queue_size, i
 int8u_t eos_send_message(eos_mqueue_t *mq, void *message, int32s_t timeout) 
 {
     // To be filled by students: Project 4
-    // get semaphore
-  if (!eos_acquire_semaphore((&mq->putsem), timeout))  return;
+    if (!eos_acquire_semaphore((&mq->putsem), timeout))  return;
 
-  char* msge = (char*)message;
+    // read the message by 1 byte
+    char* msg = (char*)message;
 
-  for (int i = 0; i < mq->msg_size; i++) {
-    // send the message in the rear part of queue
-    *(int32u_t*)(mq->rear) = msge[i];
+    for (int i = 0; i < mq->msg_size; i++) {
+        // copy the message to rear
+        *(char*)(mq->rear) = msg[i];
 
-    // if 'rear' points the end of the queue, make 'rear' point the start of the queue
-    // if not, make 'rear' point the next entry of the queue
-    if (mq->rear == (int32u_t*)mq->queue_start + mq->queue_size * mq->msg_size){
-      mq->rear = mq->queue_start;
+        // Change rear by increasing and check the 
+        // pointer is in range of queue by dividing with queue size
+        mq->rear = (mq->rear + 1 - mq->queue_start) 
+            % (mq->queue_size * mq->msg_size + 1) + mq->queue_start;
     }
-    else {
-      mq->rear++;
-    }
-  }
-  // release semaphore
-  eos_release_semaphore(&mq->getsem);
+    // release semaphore
+    eos_release_semaphore(&mq->getsem);
 }
 
 
 int8u_t eos_receive_message(eos_mqueue_t *mq, void *message, int32s_t timeout)
 {
     // To be filled by students: Project 4
+    if (!eos_acquire_semaphore(&(mq->getsem), timeout)) return;
 
-    // get semaphore
-  if (!eos_acquire_semaphore(&(mq->getsem), timeout)) return;
-  //PRINT("semaphore acquired\n");
+    // read the message by 1 byte
+    char* msg = (char*)message;
 
-  char* msge = (char*)message;
+    for (int i =0; i < mq->msg_size; i++) {
+        // get the message from the front part of queue
+        msg[i] = *((char*)(mq->front));
 
-  for (int i =0; i < mq->msg_size; i++) {
-    // get the message from the front part of queue
-    msge[i] = *((int32u_t*)(mq->front));
-
-    // if 'front' points the end of the queue, make 'front' point the start of the queue
-    // if not, make 'rear' point the next entry of the queue
-    if (mq->front == (int32u_t*)mq->queue_start + mq->queue_size * mq->msg_size){
-      mq->front = mq->queue_start;
+        // Change front by increasing and check the 
+        // pointer is in range of queue by dividing with queue size
+        mq->front = (mq->front + 1 - mq->queue_start) 
+            % (mq->queue_size * mq->msg_size + 1) + mq->queue_start;
     }
-    else {
-      mq->front++;
-    }
-  }
-  // release semaphore
-  eos_release_semaphore(&mq->putsem);
-  //PRINT("semaphore released\n");
+    // release semaphore
+    eos_release_semaphore(&mq->putsem);
 }
