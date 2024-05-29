@@ -193,13 +193,13 @@ extern int8u_t eos_get_scheduler_lock();
 typedef struct eos_mqueue {
     // To be filled by students: Project 4
     int16u_t queue_size;
-	int8u_t msg_size;
-	void *queue_start;
-	void *front;
-	void *rear;
-	int8u_t queue_type;
-	eos_semaphore_t putsem;
-	eos_semaphore_t getsem;
+    int8u_t msg_size;
+    void *queue_start;
+    void *front;
+    void *rear;
+    int8u_t queue_type;
+    eos_semaphore_t putsem;
+    eos_semaphore_t getsem;
 } eos_mqueue_t;
 
 /**
