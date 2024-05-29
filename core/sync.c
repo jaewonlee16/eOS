@@ -13,7 +13,7 @@
 void eos_init_semaphore(eos_semaphore_t *sem, int32u_t initial_count, int8u_t queue_type)
 {
     // To be filled by students: Project 4
-    sem->count = initial_count;
+	sem->count = initial_count;
 	sem->wait_queue = NULL;
 	sem-> queue_type = queue_type;
 }
@@ -22,7 +22,7 @@ void eos_init_semaphore(eos_semaphore_t *sem, int32u_t initial_count, int8u_t qu
 int32u_t eos_acquire_semaphore(eos_semaphore_t *sem, int32s_t timeout)
 {
     // To be filled by students: Project 4
-    hal_disable_interrupt();
+	hal_disable_interrupt();
 
 	// if the resource is available
 	if (sem->count > 0) {
@@ -81,9 +81,9 @@ int32u_t eos_acquire_semaphore(eos_semaphore_t *sem, int32s_t timeout)
 void eos_release_semaphore(eos_semaphore_t *sem)
 {
     // To be filled by students: Project 4
-    sem->count++;
+	sem->count++;
 	if (sem->wait_queue) {
-        //PRINT("delete alarm and wake up\n")
+		//PRINT("delete alarm and wake up\n")
 		eos_tcb_t* wake_task = (eos_tcb_t*)(sem->wait_queue->ptr_data);
 		eos_set_alarm(eos_get_system_timer(), wake_task->alarm, 0, NULL, NULL);
 		_os_remove_node(&(sem->wait_queue), sem->wait_queue);
