@@ -135,8 +135,8 @@ void eos_trigger_counter(eos_counter_t* counter);
 typedef struct eos_semaphore {
     // To be filled by students: Project 4
     int32u_t count;
-	_os_node_t* wait_queue;
-	int8u_t queue_type;
+    _os_node_t* wait_queue;
+    int8u_t queue_type;
 } eos_semaphore_t;
 
 /**
