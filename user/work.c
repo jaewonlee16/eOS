@@ -93,6 +93,6 @@ void eos_user_main() {
     eos_create_task(&tcb2, stack2, STACK_SIZE, receiver_task1, NULL, 20); 
     eos_set_period(&tcb2, 6);
 
-    eos_init_mqueue(&mq0, queue0, 5, 2, 1);
-	eos_init_mqueue(&mq1, queue1, 5, 2, 1);
+    eos_init_mqueue(&mq0, queue0, 5, 3, 1);
+	eos_init_mqueue(&mq1, queue1, 5, 3, 1);
 }
