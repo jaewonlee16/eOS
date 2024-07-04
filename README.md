@@ -53,6 +53,7 @@ The eOS project is divided into several subprojects, each focusing on different 
   
 2. **Project 2: Multi-tasking**
    - Implement and understand multi-tasking within the eOS kernel.
+   - For details see the [section below](#eos-project-2-context-switching-implementation)
 
 3. **Project 3: Periodic Task and Priority Scheduler**
    - [Report](https://github.com/jaewonlee16/eOS/blob/master/eOS_project3_report.pdf)
@@ -262,3 +263,148 @@ The eOS project is divided into several subprojects, each focusing on different 
 - **`hal_restore_interrupt()`**: Restores the interrupt flag from the stack, ensuring proper interrupt handling.
 
 This analysis provides an in-depth look at the initialization and interrupt handling routines within the eOS kernel, highlighting key functions and their roles in the system.
+
+
+
+# eOS Project 2: Context Switching Implementation
+
+## Overview
+This project involves implementing key structures and functions required for context switching in the eOS kernel. The goal is to understand and create the essential components for task management and context switching in a real-time operating system (RTOS).
+
+## Implemented Structures and Functions
+
+### 1. `hal/linux/context.c`
+- **Structure:** `_os_context_t`
+- **Functions:**
+  - `_os_create_context()`
+  - `_os_save_context()`
+  - `_os_restore_context()`
+
+### 2. `core/eos.h`
+- **Structure:** `eos_tcb_t`
+
+### 3. `core/task.c`
+- **Functions:**
+  - `eos_create_task()`
+  - `eos_schedule()`
+
+## Detailed Description
+
+### `_os_context_t` Structure
+The `_os_context_t` structure defines the information that needs to be saved during a context switch. This includes various CPU registers.
+
+
+### `_os_create_context()` Function
+- **Prototype:** `addr_t _os_create_context(addr_t stack_base, size_t stack_size, void (*entry)(void *arg), void *arg);`
+- **Defined in:** `core/eos_internal.h`
+- **Implemented in:** `hal/linux/context.c`
+- **Description:** Creates a new context on the given stack.
+- **Input:**
+  - `stack_base`: Start address of the stack (low address)
+  - `stack_size`: Size of the stack (in bytes)
+  - `entry`: Address of the function to be executed when the context is restored
+  - `arg`: Argument to be passed to the entry function
+- **Output:** Start address of the created context.
+
+#### Detailed Steps:
+- Create a fake stack for the new task without using inline assembly.
+- Save the argument (`arg`) for the `entry` function at the bottom of the stack.
+- Save a fake return address (NULL) for the `entry` function since it should not return in eOS.
+- Save the initial register values (context) for the `entry` function on the stack:
+  - Only `_eflags` and `%eip` have meaningful values.
+  - `_eflags` is set to 1.
+  - `%eip` is set to the address of the `entry` function.
+  - Other registers can be set to NULL.
+- Return the address where the context is saved and exit the function.
+
+### `_os_save_context()` Function
+- **Prototype:** `addr_t _os_save_context(void)`
+- **Defined in:** `core/eos_internal.h`
+- **Implemented in:** `hal/linux/context.c`
+- **Description:** Saves the current context to the stack and returns the stack pointer.
+- **Input:** None
+- **Output:** Pointer to the saved context on the stack, or `NULL`/`0` when restoring context.
+
+#### Detailed Steps:
+- Use inline assembly to save individual registers.
+- Save the necessary registers (context) to the stack:
+  - `%eip` is the address to resume execution upon context restoration.
+  - `%eax` should store `0` for the return value upon context restoration.
+- Save the stack pointer to `%eax`.
+- To protect the saved context, push the `%eip` and `%ebp` at the bottom of the stack frame to the top and modify `%ebp`.
+- Use `leave` and `ret` instructions to return.
+
+
+### `_os_restore_context()` Function
+- **Prototype:** `void _os_restore_context(addr_t sp)`
+- **Defined in:** `core/eos_internal.h`
+- **Implemented in:** `hal/linux/context.c`
+- **Description:** Restores the context from the saved stack content.
+- **Input:** `sp`: Top address of the stack where the context is saved.
+- **Output:** None
+
+#### Detailed Steps:
+- Use inline assembly to restore the saved registers.
+- Change the stack pointer to the location where the context is saved.
+- Pop the values of the saved registers sequentially.
+- Jump to the `resume_point` in `_os_save_context()` (effectively a return).
+- Return from `_os_save_context()` to `eos_schedule()`.
+  - Before returning, restore `%ebp` from the stack using the `leave` instruction.
+
+### `eos_create_task()` Function
+- **Prototype:** `int32u_t eos_create_task(eos_tcb_t *task, addr_t sblock_start, size_t sblock_size, void (*entry)(void *arg), void *arg, int32u_t priority)`
+- **Defined in:** `core/task.c`
+- **Description:** Creates and initializes a task.
+- **Input:**
+  - `task`: TCB structure holding the task information.
+  - `sblock_start`: Start address of the stack allocated to the task.
+  - `sblock_size`: Size of the stack.
+  - `entry`: Address of the function to be executed as the task.
+  - `arg`: Argument to be passed to the `entry` function.
+  - `priority`: Priority of the task.
+- **Output:** `0`
+
+### `eos_schedule()` Function
+- **Description:** Switches context from the current task to a new task.
+- **Detailed Steps:**
+  - Call `_os_save_context()` to save the current task's context and handle the return value as follows:
+    - If the return value is not NULL (context saved successfully):
+      - Record the return value (stack pointer) in the TCB.
+      - Select the highest priority task from the ready queue.
+      - Call `_os_restore_context()` to restore the context of the selected task.
+    - If the return value is NULL (context just restored):
+      - Simply return from the function.
+  - During the first task execution after boot, there is no currently executing task. Thus, only the first task's context needs to be restored without saving any context.
+
+## Usage
+change the *eos/work.c* to this code and build the eOS
+```c
+#include <core/eos.h>
+#define STACK_SIZE 8096
+static int8u_t stack0[STACK_SIZE]; // stack for task0
+static int8u_t stack1[STACK_SIZE]; // stack for task1
+static eos_tcb_t tcb0; // tcb for task0
+static eos_tcb_t tcb1; // tcb for task1
+void print_numbers(void *arg) { // Function for task0: Print numbers from 1 to 20 repeatedly
+ int i = 1;
+ while(1) {
+ printf("%d", i)
+eos_schedule(); // Yield CPU to task1
+if (i++ == 20) { i = 1; }
+ }
+}
+void print_alphabet(void *arg) { // Function for task1: Print alphabet from ‘a’ to ‘z’ repeatedly
+ int i = 97;
+ while(1) {
+ printf("%c", i);
+eos_schedule(); // Yield CPU to task0
+if (i++ == 122) { i = 97; }
+ }
+}
+void eos_user_main() {
+ // This is the test code for Project 2
+ // Note that you must use a priority of 0 only since the priority-based scheduling hasn’t been implemented yet
+ eos_create_task(&tcb0, (addr_t) stack0, STACK_SIZE, print_numbers, NULL, 0);
+eos_create_task(&tcb1, (addr_t) stack1, STACK_SIZE, print_alphabet, NULL, 0);
+}
+```
